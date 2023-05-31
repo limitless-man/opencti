@@ -81,8 +81,7 @@ By leveraging these distributed components and load balancing techniques, this O
 
 ### Built With
 
-<!-- *
-* [![Yaml][yaml.org]][Yaml-url] -->
+* [![Yaml][yaml.org]][Yaml-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
