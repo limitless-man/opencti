@@ -1,0 +1,120 @@
+version: "3.7"
+x-minio-common: &minio-common
+  image: minio/minio:${MINIO_VERSION}
+  hostname: minio
+  command: server --console-address ":9001" http://minio{1...4}/data{1...2}
+  environment:
+    MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+    MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    #MINIO_PROMETHEUS_JOB_ID: "minio-job"
+    #MINIO_PROMETHEUS_URL: "http://prometheus:9090"
+    #MINIO_PROMETHEUS_AUTH_TYPE: "public"
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+    interval: 30s
+    timeout: 20s
+    retries: 3
+  restart: always
+  deploy:
+    placement:
+      constraints:
+        - node.hostname == ${NODE_HOSTNAME_MINIO}
+  networks:
+    - minio
+    - opencti_ingest_proxy
+    - opencti_analyst_proxy
+services:
+  minio1:
+    <<: *minio-common
+    hostname: minio1
+    volumes:
+      - data1-1:/data1
+      - data1-2:/data2
+
+  minio2:
+    <<: *minio-common
+    hostname: minio2
+    volumes:
+      - data2-1:/data1
+      - data2-2:/data2
+
+  minio3:
+    <<: *minio-common
+    hostname: minio3
+    volumes:
+      - data3-1:/data1
+      - data3-2:/data2
+
+  minio4:
+    <<: *minio-common
+    hostname: minio4
+    volumes:
+      - data4-1:/data1
+      - data4-2:/data2
+  nginx:
+    image: nginx:1.19.2-alpine
+    hostname: minio
+    configs:
+      - source: proxy_minio
+        target: /etc/nginx/nginx.conf
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 30s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_MINIO}
+    depends_on:
+      - minio1
+      - minio2
+      - minio3
+      - minio4
+    networks:
+      - minio
+      - minio_proxy
+      - proxy_platform_overlay
+
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   hostname: prometheus
+  #   volumes:
+  #     - ./prometheus.yml:/etc/prometheus/prometheus.yml
+  #   command:
+  #     - '--config.file=/etc/prometheus/prometheus.yml'
+  #     - '--web.enable-lifecycle'
+  #   ports:
+  #     - 9090:9090
+  #   deploy:
+  #     placement:
+  #       constraints:
+  #         - node.hostname == ${NODE_HOSTNAME_MINIO}
+  #   networks:
+  #     - minio
+volumes:
+  data1-1:
+  data1-2:
+  data2-1:
+  data2-2:
+  data3-1:
+  data3-2:
+  data4-1:
+  data4-2:
+  prometheus_data:
+
+configs:
+  proxy_minio:
+    external: true
+
+networks:
+  minio:
+    external: true
+  minio_proxy:
+    external: true
+  proxy_platform_overlay:
+    external: true
+  opencti_ingest_proxy:
+    external: true
+  opencti_analyst_proxy:
+    external: true

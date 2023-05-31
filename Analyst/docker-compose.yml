@@ -1,0 +1,107 @@
+version: "3.7"
+x-opencti_analyst-common: &opencti_analyst-common
+  image: opencti/platform:latest
+  hostname: opencti_analyst
+  environment:
+    - NODE_OPTIONS=--max-old-space-size=8096
+    - APP__PORT=8080
+    - APP__BASE_URL=${OPENCTI_BASE_URL}
+    - APP__ADMIN__EMAIL=${OPENCTI_ADMIN_EMAIL}
+    - APP__ADMIN__PASSWORD=${OPENCTI_ADMIN_PASSWORD}
+    - APP__ADMIN__TOKEN=${OPENCTI_ADMIN_TOKEN}
+    - APP__APP_LOGS__LOGS_LEVEL=error
+    - REDIS__HOSTNAME=redis_proxy
+    - REDIS__PORT=6379
+    - ELASTICSEARCH__URL=https://${OPENCTI_ELASTICSEARCH_USERNAME}:${OPENCTI_ELASTICSEARCH_PASSWORD}@${OPENCTI_API_ELASTICSEARCH_URL}
+    - MINIO__ENDPOINT=minio
+    - MINIO__PORT=9000
+    - MINIO__USE_SSL=false
+    - MINIO__ACCESS_KEY=${MINIO_ROOT_USER}
+    - MINIO__SECRET_KEY=${MINIO_ROOT_PASSWORD}
+    - RABBITMQ__HOSTNAME=rabbitmq_proxy
+    - RABBITMQ__PORT=5672                          #Non cluster RabbitMQ Port 25672
+    - RABBITMQ__PORT_MANAGEMENT=15672
+    - RABBITMQ__MANAGEMENT_SSL=false
+    - RABBITMQ__USERNAME=${RABBITMQ_DEFAULT_USER}
+    - RABBITMQ__PASSWORD=${RABBITMQ_DEFAULT_PASS}
+    - SMTP__HOSTNAME=${SMTP_HOSTNAME}
+    - SMTP__PORT=25
+    - PROVIDERS__LOCAL__STRATEGY=LocalStrategy
+    - SUBSCRIPTION_SCHEDULER__ENABLED=${SUBSCRIPTION_SCHEDULER__ENABLED}
+  networks:
+    - opencti_analyst
+    - opencti_ingest_proxy
+    - redis_proxy
+    - rabbitmq_proxy
+    - minio_proxy
+  deploy:
+    replicas: 1
+    placement:
+      constraints:
+        - node.hostname == ${NODE_HOSTNAME_ANALYST}
+  restart: always
+
+services:
+  opencti_analyst1:
+    <<: *opencti_analyst-common
+    hostname: opencti_analyst1
+
+  opencti_analyst2:
+    <<: *opencti_analyst-common
+    hostname: opencti_analyst2
+
+  opencti_analyst3:
+    <<: *opencti_analyst-common
+    hostname: opencti_analyst3
+
+  opencti_analyst4:
+    <<: *opencti_analyst-common
+    hostname: opencti_analyst4
+
+  nginx:
+    image: nginx:1.19.2-alpine
+    hostname: opencti_analyst
+    configs:
+      - source: proxy_analyst
+        target: /etc/nginx/nginx.conf
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 30s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_ANALYST}
+    depends_on:
+      - opencti_analyst1
+      - opencti_analyst2
+      - opencti_analyst3
+      - opencti_analyst4
+    networks:
+      - opencti_analyst
+      - opencti_analyst_proxy
+      - proxy_platform_overlay
+
+configs:
+  proxy_analyst:
+    external: true
+
+volumes:
+  nginx_conf:
+
+networks:
+  redis_proxy:
+    external: true
+  minio_proxy:
+    external: true
+  rabbitmq_proxy:
+    external: true
+  opencti_analyst:
+    external: true
+  opencti_analyst_proxy:
+    external: true
+  opencti_ingest_proxy:
+    external: true
+  proxy_platform_overlay:
+    external: true

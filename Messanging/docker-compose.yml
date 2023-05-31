@@ -1,0 +1,109 @@
+version: "3.7"
+x-rabbitmq-common: &rabbitmq-common
+  image: rabbitmq:${RABBITMQ_VERSION}
+  hostname: rabbitmq
+  configs:
+    - source: rabbitmq_config
+      target: /etc/rabbitmq/rabbitmq.conf
+  environment:
+    - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+    - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+    - RABBITMQ_ERLANG_COOKIE=${RABBITMQ_EARLANG_COOKIE}
+  restart: always
+  deploy:
+    replicas: 1
+    placement:
+      constraints:
+        - node.hostname == ${NODE_HOSTNAME_MESSANGING}
+  networks:
+    - rabbitmq
+    - internal-connectors
+    - external-connectors
+    - workers_int
+    - workers_ext
+
+services:
+  rabbitmq1:
+    <<: *rabbitmq-common
+    hostname: rabbitmq1
+    volumes:
+      - amqpdata1:/var/lib/rabbitmq
+
+  rabbitmq2:
+    <<: *rabbitmq-common
+    hostname: rabbitmq2
+    volumes:
+      - amqpdata2:/var/lib/rabbitmq
+
+  rabbitmq3:
+    <<: *rabbitmq-common
+    hostname: rabbitmq3
+    volumes:
+      - amqpdata3:/var/lib/rabbitmq
+
+  rabbitmq4:
+    <<: *rabbitmq-common
+    hostname: rabbitmq4
+    volumes:
+      - amqpdata4:/var/lib/rabbitmq
+
+  nginx:
+    image: nginx:1.19.2-alpine
+    hostname: rabbitmq_proxy
+    configs:
+      - source: proxy_rabbitmq
+        target: /etc/nginx/nginx.conf
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 120s
+      replicas: 1
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_MESSANGING}
+    depends_on:
+      - rabbitmq1
+      - rabbitmq2
+      - rabbitmq3
+      - rabbitmq4
+    networks:
+      - rabbitmq
+      - rabbitmq_proxy
+      - proxy_platform_overlay
+
+volumes:
+  amqpdata1:
+  amqpdata2:
+  amqpdata3:
+  amqpdata4:
+
+configs:
+  proxy_rabbitmq:
+    external: true
+  rabbitmq_config:
+    external: true
+
+networks:
+  rabbitmq:
+    driver: overlay
+    external: true
+  rabbitmq_proxy:
+    driver: overlay
+    external: true
+  internal-connectors:
+    driver: overlay
+    external: true
+  external-connectors:
+    driver: overlay
+    external: true
+  proxy_platform_overlay:
+    external: true
+    driver: overlay
+  workers_int:
+    external: true
+    driver: overlay
+  workers_ext:
+    external: true
+    driver: overlay

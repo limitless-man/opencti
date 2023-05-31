@@ -1,0 +1,7 @@
+## External Connectors 
+
+External Connectors are the mighty warriors of OpenCTI that excel at importing data from various sources. They're like the fearless explorers venturing into the vast wilderness of information to gather valuable intelligence for your OpenCTI instance. These connectors have the power to connect with external systems, APIs, databases, and even crawl through the darkest corners of the web to bring back precious data nuggets.
+
+Now, here's the juicy part. You can unleash your creativity and build your own connectors for OpenCTI. It's like being the mad scientist of data importation! To create your custom connector, you'll need to dive into the OpenCTI codebase and leverage the powerful plugin system provided by the platform. This allows you to integrate your connector seamlessly and extend the capabilities of OpenCTI according to your unique requirements.
+
+But hold on, it's not as daunting as it sounds. OpenCTI provides a comprehensive documentation and development guide to help you on your connector-building quest. From defining the connector's behavior and configuration options to handling data extraction and mapping, you'll have all the resources to craft a badass connector tailored to your needs.

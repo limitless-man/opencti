@@ -1,0 +1,97 @@
+version: "3.7"
+x-redis-common: &redis-common
+  image: redis:${REDIS_VERSION}
+  hostname: redis
+  restart: always
+  networks:
+    - redis
+    - opencti_ingest_proxy
+    - opencti_analyst_proxy
+  deploy:
+    placement:
+      constraints:
+        - node.hostname == ${NODE_HOSTNAME_REDIS}
+    resources:
+      limits:
+        memory: 2G
+
+services:
+  redis1:
+    <<: *redis-common
+    hostname: redis1
+    volumes:
+      - redisdata1-1:/data1
+      - redisdata1-2:/data2
+
+  redis2:
+    <<: *redis-common
+    hostname: redis2
+    volumes:
+      - redisdata2-1:/data1
+      - redisdata2-2:/data2
+
+  redis3:
+    <<: *redis-common
+    hostname: redis3
+    volumes:
+      - redisdata3-1:/data1
+      - redisdata3-2:/data2
+
+  redis4:
+    <<: *redis-common
+    hostname: redis4
+    volumes:
+      - redisdata4-1:/data1
+      - redisdata4-2:/data2
+
+  nginx:
+    image: nginx:1.19.2-alpine
+    hostname: redis_proxy
+    configs:
+      - source: proxy_redis
+        target: /etc/nginx/nginx.conf
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_REDIS}
+    depends_on:
+      - redis1
+      - redis2
+      - redis3
+      - redis4
+    networks:
+      - redis
+      - redis_proxy
+
+volumes:
+  redisdata1-1:
+  redisdata1-2:
+  redisdata2-1:
+  redisdata2-2:
+  redisdata3-1:
+  redisdata3-2:
+  redisdata4-1:
+  redisdata4-2:
+
+configs:
+  proxy_redis:
+    external: true
+
+networks:
+  redis:
+    driver: overlay
+    external: true
+  redis_proxy:
+    driver: overlay
+    external: true
+  opencti_ingest_proxy:
+    driver: overlay
+    external: true
+  opencti_analyst_proxy:
+    driver: overlay
+    external: true

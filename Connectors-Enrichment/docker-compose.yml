@@ -1,0 +1,298 @@
+version: "3.7"
+services:
+  worker:
+    image: opencti/worker:latest
+    environment:
+      - OPENCTI_URL=${OPENCTI_URL}
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - WORKER_LOG_LEVEL=info
+    depends_on:
+      - opencti_ingest
+    deploy:
+      mode: replicated
+      replicas: 8
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_WORKERS}
+    restart: always
+    networks:
+      - workers_int
+      - rabbitmq_proxy
+      - opencti_ingest_proxy
+      - opencti_analyst_proxy
+
+  connector-import-file-stix:
+    image: opencti/connector-import-file-stix:latest
+    environment:
+      - OPENCTI_URL=${OPENCTI_URL}
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=${CONNECTOR_IMPORT_FILE_STIX_ID} # Valid UUIDv4
+      - CONNECTOR_TYPE=INTERNAL_IMPORT_FILE
+      - CONNECTOR_NAME=ImportFileStix
+      - CONNECTOR_VALIDATE_BEFORE_IMPORT=true # Validate any bundle before import
+      - CONNECTOR_SCOPE=application/json,text/xml
+      - CONNECTOR_AUTO=true # Enable/disable auto-import of file
+      - CONNECTOR_CONFIDENCE_LEVEL=15 # From 0 (Unknown) to 100 (Fully trusted)
+      - CONNECTOR_LOG_LEVEL=info
+    restart: always
+    depends_on:
+      - opencti_ingest
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_WORKERS}
+    networks:
+      - internal-connectors
+      - rabbitmq_proxy
+      - opencti_ingest_proxy
+
+  connector-import-document:
+    image: opencti/connector-import-document:latest
+    environment:
+      - OPENCTI_URL=${OPENCTI_URL}
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=${CONNECTOR_IMPORT_DOCUMENT_ID} # Valid UUIDv4
+      - CONNECTOR_TYPE=INTERNAL_IMPORT_FILE
+      - CONNECTOR_NAME=ImportDocument
+      - CONNECTOR_VALIDATE_BEFORE_IMPORT=true # Validate any bundle before import
+      - CONNECTOR_SCOPE=application/pdf,text/plain,text/html
+      - CONNECTOR_AUTO=true # Enable/disable auto-import of file
+      - CONNECTOR_ONLY_CONTEXTUAL=false # Only extract data related to an entity (a report, a threat actor, etc.)
+      - CONNECTOR_CONFIDENCE_LEVEL=15 # From 0 (Unknown) to 100 (Fully trusted)
+      - CONNECTOR_LOG_LEVEL=info
+      - IMPORT_DOCUMENT_CREATE_INDICATOR=true
+    restart: always
+    depends_on:
+      - opencti_ingest
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_WORKERS}
+    networks:
+      - internal-connectors
+      - rabbitmq_proxy
+      - opencti_ingest_proxy
+
+  connector-import-external-reference:
+    image: opencti/connector-import-external-reference:latest
+    environment:
+      - OPENCTI_URL=${OPENCTI_URL}
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=${CONNECTOR_IMPORT_EXTERNAL_REFERENCE_ID}
+      - CONNECTOR_TYPE=INTERNAL_ENRICHMENT
+      - CONNECTOR_NAME=ImportExternalReference
+      - CONNECTOR_SCOPE=External-Reference
+      - CONNECTOR_AUTO=false # Enable/disable auto-import of external references
+      - CONNECTOR_CONFIDENCE_LEVEL=15 # From 0 (Unknown) to 100 (Fully trusted)
+      - CONNECTOR_LOG_LEVEL=info
+      - IMPORT_EXTERNAL_REFERENCE_IMPORT_AS_PDF=true # Import as PDF file
+      - IMPORT_EXTERNAL_REFERENCE_IMPORT_AS_MD=true # Import as MarkDown file
+      - IMPORT_EXTERNAL_REFERENCE_IMPORT_PDF_AS_MD=true # If import_as_md is true, try to convert PDF as Markdown
+    restart: always
+    depends_on:
+      - opencti_ingest
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_WORKERS}
+    networks:
+      - internal-connectors
+      - rabbitmq_proxy
+      - opencti_ingest_proxy
+
+   connector-hygiene:
+    image: opencti/connector-hygiene:latest
+    environment:
+      - OPENCTI_URL=${OPENCTI_URL}
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=${CONNECTOR_HYGIENE_ID}
+      - CONNECTOR_TYPE=INTERNAL_ENRICHMENT
+      - CONNECTOR_NAME=Hygiene
+      - CONNECTOR_SCOPE=IPv4-Addr,IPv6-Addr,Domain-Name,StixFile,Artifact
+      - CONNECTOR_AUTO=true
+      - CONNECTOR_CONFIDENCE_LEVEL=15 # From 0 (Unknown) to 100 (Fully trusted)
+      - CONNECTOR_LOG_LEVEL=info
+      - HYGIENE_WARNINGLISTS_SLOW_SEARCH=false # Enable warning lists slow search mode
+      - HYGIENE_ENRICH_SUBDOMAINS=true # Enrich subdomains with hygiene_parent label if the parents are found in warninglists
+    restart: always
+    depends_on:
+      - opencti_ingest
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_WORKERS}
+    networks:
+      - internal-connectors
+      - rabbitmq_proxy
+      - opencti_ingest_proxy
+      
+  connector-yara:
+    image: opencti/connector-yara:latest
+    environment:
+      - OPENCTI_URL=${OPENCTI_URL}
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=${CONNECTOR_YARA_ID}
+      - CONNECTOR_TYPE=INTERNAL_ENRICHMENT
+      - CONNECTOR_NAME=YARA
+      - CONNECTOR_SCOPE=Artifact # MIME type or Stix Object
+      - CONNECTOR_AUTO=true
+      - CONNECTOR_CONFIDENCE_LEVEL=100 # From 0 (Unknown) to 100 (Fully trusted)
+      - CONNECTOR_LOG_LEVEL=info
+    restart: always
+    depends_on:
+      - opencti_ingest
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_WORKERS}
+    networks:
+      - internal-connectors
+      - rabbitmq_proxy
+      - opencti_ingest_proxy
+  connector-google-dns:
+    image: opencti/connector-google-dns:latest
+    environment:
+      - OPENCTI_URL=${OPENCTI_URL}
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=${CONNECTOR_GOOGLE_DNS_ID}
+      - CONNECTOR_TYPE=INTERNAL_ENRICHMENT
+      - CONNECTOR_NAME=Google DNS
+      - CONNECTOR_SCOPE=Domain-Name,Hostname # MIME type or Stix Object
+      - CONNECTOR_AUTO=false
+      - CONNECTOR_CONFIDENCE_LEVEL=100 # From 0 (Unknown) to 100 (Fully trusted)
+      - CONNECTOR_LOG_LEVEL=info
+    restart: always
+    depends_on:
+      - opencti_ingest
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_WORKERS}
+    networks:
+      - internal-connectors
+      - rabbitmq_proxy
+      - opencti_ingest_proxy
+
+  connector-ivre:
+    image: opencti/connector-ivre:latest
+    environment:
+      - OPENCTI_URL=${OPENCTI_URL}
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=${CONNECTOR_IVRE_ID}
+      - CONNECTOR_TYPE=INTERNAL_ENRICHMENT
+      - CONNECTOR_NAME=ivre
+      - CONNECTOR_SCOPE=autonomous-system,domain-name,ipv4-addr,ipv6-addr,mac-addr,x509-certificate
+      - CONNECTOR_AUTO=true
+      - CONNECTOR_CONFIDENCE_LEVEL=100 # From 0 (Unknown) to 100 (Fully trusted)
+      - CONNECTOR_LOG_LEVEL=info
+      - IVRE_MAX_TLP=TLP:AMBER
+      - IVRE_DB_URL=mongodb://ivredb/
+      - IVRE_DB_URL_DATA=maxmind:/usr/local/share/ivre/geoip
+      - IVRE_DB_URL_PASSIVE=mongodb://ivredb/
+      - IVRE_DB_URL_SCANS=mongodb://ivredb/
+      - IVRE_USE_DATA=true
+      - IVRE_USE_PASSIVE=true
+      - IVRE_USE_PASSIVE_AS=true
+      - IVRE_USE_PASSIVE_DOMAIN=true
+      - IVRE_USE_SCANS=true
+      - IVRE_USE_SCANS_AS=true
+      - IVRE_USE_SCANS_DOMAIN=true
+    volumes:
+      - maxmind:/usr/local/share/ivre/geoip
+      - ivre-share:/ivre-share
+      - mongodb:/var/lib/mongodb
+      - mongodb:/var/log/mongodb
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_WORKERS}
+    restart: always
+    depends_on:
+      - opencti_ingest
+    networks:
+      - internal-connectors
+      - rabbitmq_proxy
+      - opencti_ingest_proxy
+
+  ivredb:
+    image: ivre/db
+    container_name: ivredb
+    volumes:
+      - mongodb:/var/lib/mongodb
+      - mongodb:/var/log/mongodb
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_WORKERS}
+    networks:
+      - internal-connectors
+      - rabbitmq_proxy
+      - opencti_ingest_proxy
+    restart: always
+  ivreclient:
+    image: ivre/client:latest
+    hostname: ivreclient
+    container_name: ivreclient
+    #command: /bin/bash -c "bash /etc/bin/ivre_init.sh" # Comment after the command is done as the container will keep restarting
+    volumes:
+      - ivre-share:/ivre-share
+      - maxmind:/usr/local/share/ivre/geoip
+    environment:
+      - MAXMIND_LICENSE_KEY_FILE=/run/secrets/maxmind_license_key
+    secrets:
+      - maxmind_license_key
+    networks:
+      - internal-connectors
+      - rabbitmq_proxy
+      - opencti_ingest_proxy
+    depends_on:
+      - ivredb
+    deploy:
+      replicas: 5
+      restart_policy:
+        delay: 10m
+        max_attempts: 10
+        window: 60s
+      placement:
+        constraints:
+          - node.hostname == ${NODE_HOSTNAME_WORKERS}
+    configs:
+      - source: ivre_custom_config
+        target: /etc/ivre.conf
+      - source: ivre_init
+        target: /etc/bin/ivre_init.sh
+    restart: always
+    stdin_open: true
+    tty: true
+
+volumes:
+  ivre-share:
+  mongodb:
+  maxmind:
+
+networks:
+  internal-connectors:
+    driver: overlay
+    external: true
+  opencti_ingest_proxy:
+    driver: overlay
+    external: true
+  opencti_analyst_proxy:
+    driver: overlay
+    external: true
+  rabbitmq_proxy:
+    driver: overlay
+    external: true
+  workers_int:
+    driver: overlay
+    external: true
+
+secrets:
+  maxmind_license_key:
+    external: true
+
+configs:
+  ivre_custom_config:
+    external: true
+  ivre_init:
+    external: true
