@@ -47,9 +47,9 @@ ivre ipdata --download --import-all
 ```
 
 
-## maxmind_license_key.conf
+## maxmind_license_key.secret
 
-Last but not least, we have the `maxmind_license_key.conf` file. It holds the key to unlock the power of MaxMind's magical data. Don't forget to fill in your MaxMind license key:
+Last but not least, we have the `maxmind_license_key.secret` file. It holds the key to unlock the power of MaxMind's magical data. Don't forget to fill in your MaxMind license key:
 
 ```
 ### ENTER MAXMIND LICENSE KEY HERE
